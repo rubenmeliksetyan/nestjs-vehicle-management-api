@@ -1,6 +1,16 @@
+const path = require('path');
+const root = path.resolve(__dirname, '..');
 try {
-  require('dotenv').config({ path: '.env' });
-  require('dotenv').config({ path: '.env.local' });
+  require('dotenv').config({
+    path: path.join(root, '.env'),
+    silent: true,
+    quiet: true,
+  });
+  require('dotenv').config({
+    path: path.join(root, '.env.local'),
+    silent: true,
+    quiet: true,
+  });
 } catch (_) {}
 
 const base = {

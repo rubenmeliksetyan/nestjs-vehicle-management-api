@@ -25,7 +25,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:run": "node scripts/run-migrations.js",
-    "migration:generate": "sequelize-cli migration:generate --name"
+    "migration:generate": "sequelize-cli migration:generate --name",
+    "seed": "node --no-deprecation scripts/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -39,7 +40,8 @@
     "rxjs": "^7.8.1",
     "@nestjs/sequelize": "^11.0.0",
     "sequelize": "^6.37.5",
-    "sequelize-typescript": "^2.1.6"
+    "sequelize-typescript": "^2.1.6",
+    "bcrypt": "^5.1.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
