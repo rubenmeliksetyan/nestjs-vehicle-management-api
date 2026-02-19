@@ -69,6 +69,10 @@ export class AuthService {
     return { accessToken };
   }
 
+  getMe(user: User): UserResponseDto {
+    return this.toResponse(user);
+  }
+
   private toResponse(user: User): UserResponseDto {
     return {
       id: user.id,
