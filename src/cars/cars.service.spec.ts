@@ -293,6 +293,70 @@ describe('CarsService', () => {
     });
   });
 
+  describe('listGroupedByCategory', () => {
+    it('returns cars grouped by category sorted by category name', async () => {
+      const sedan = {
+        id: 1,
+        name: 'Sedan',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const suv = {
+        id: 2,
+        name: 'SUV',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const cars = [
+        {
+          ...mockCar,
+          id: 1,
+          categoryId: 2,
+          category: suv,
+          images: [],
+          tags: [],
+        },
+        {
+          ...mockCar,
+          id: 2,
+          categoryId: 1,
+          category: sedan,
+          images: [],
+          tags: [],
+        },
+      ];
+      carModel.findAll.mockResolvedValue(cars);
+
+      const result = await service.listGroupedByCategory();
+
+      expect(carModel.findAll).toHaveBeenCalledWith({
+        include: [
+          expect.objectContaining({
+            model: Category,
+            as: 'category',
+            required: true,
+          }),
+          expect.objectContaining({ model: CarImage }),
+          expect.objectContaining({ model: Tag }),
+        ],
+        order: [['createdAt', 'DESC']],
+      });
+      expect(result).toHaveLength(2);
+      expect(result[0]?.category.name).toBe('Sedan');
+      expect(result[1]?.category.name).toBe('SUV');
+      expect(result[0]?.cars).toHaveLength(1);
+      expect(result[1]?.cars).toHaveLength(1);
+    });
+
+    it('returns empty array when no cars', async () => {
+      carModel.findAll.mockResolvedValue([]);
+
+      const result = await service.listGroupedByCategory();
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('findAll', () => {
     /* eslint-disable @typescript-eslint/no-unsafe-assignment -- service from module.get() in tests */
     it('returns cars with relationships', async () => {

@@ -15,6 +15,7 @@ import { CarResponseDto } from './dto/car-response.dto';
 import { CategoryResponseDto } from '../categories/dto/category-response.dto';
 import { ListCarsQueryDto } from './dto/list-cars-query.dto';
 import { PaginatedCarsResponseDto } from './dto/paginated-cars-response.dto';
+import { CategoryGroupDto } from './dto/grouped-by-category-response.dto';
 
 @Injectable()
 export class CarsService {
@@ -145,6 +146,43 @@ export class CarsService {
       limit,
       totalPages,
     };
+  }
+
+  async listGroupedByCategory(): Promise<CategoryGroupDto[]> {
+    const cars = await this.carModel.findAll({
+      include: [
+        { model: Category, as: 'category', required: true },
+        { model: CarImage, as: 'images' },
+        { model: Tag, as: 'tags' },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    const byCategory = new Map<
+      number,
+      { category: CategoryResponseDto; cars: CarResponseDto[] }
+    >();
+
+    for (const car of cars) {
+      if (!car.category) continue;
+      const categoryDto: CategoryResponseDto = {
+        id: car.category.id,
+        name: car.category.name,
+        createdAt: car.category.createdAt,
+        updatedAt: car.category.updatedAt,
+      };
+      if (!byCategory.has(car.categoryId)) {
+        byCategory.set(car.categoryId, {
+          category: categoryDto,
+          cars: [],
+        });
+      }
+      byCategory.get(car.categoryId)!.cars.push(this.toResponse(car));
+    }
+
+    const groups = Array.from(byCategory.values());
+    groups.sort((a, b) => a.category.name.localeCompare(b.category.name));
+    return groups;
   }
 
   async findOne(id: number): Promise<CarResponseDto> {

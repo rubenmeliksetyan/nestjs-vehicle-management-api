@@ -10,4 +10,9 @@ export class PublicCarsController {
   list(@Query() query: ListCarsQueryDto) {
     return this.carsService.listPublic(query);
   }
+
+  @Get('grouped-by-category')
+  groupedByCategory() {
+    return this.carsService.listGroupedByCategory();
+  }
 }
