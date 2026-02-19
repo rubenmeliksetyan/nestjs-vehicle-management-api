@@ -9,12 +9,15 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '../common/enums/role.enum';
 import { JwtAuthGuard, RolesGuard, Roles } from '../auth';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
+@ApiTags('admin/categories')
+@ApiBearerAuth('access-token')
 @Controller('categories')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)

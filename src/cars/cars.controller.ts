@@ -9,12 +9,15 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '../common/enums/role.enum';
 import { JwtAuthGuard, RolesGuard, Roles } from '../auth';
 import { CarsService } from './cars.service';
 import { CreateCarDto } from './dto/create-car.dto';
 import { UpdateCarDto } from './dto/update-car.dto';
 
+@ApiTags('admin/cars')
+@ApiBearerAuth('access-token')
 @Controller('admin/cars')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)

@@ -2,11 +2,19 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
 
+interface DatabaseConfig {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database: string;
+}
+
 @Module({
   imports: [
     SequelizeModule.forRootAsync({
       useFactory: (config: ConfigService) => {
-        const db = config.get('database');
+        const db = config.get<DatabaseConfig>('database');
         if (!db) {
           throw new Error('Database config is required');
         }

@@ -1,7 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { CarsService } from './cars.service';
 import { ListCarsQueryDto } from './dto/list-cars-query.dto';
 
+@ApiTags('cars (public)')
 @Controller('cars')
 export class PublicCarsController {
   constructor(private readonly carsService: CarsService) {}
