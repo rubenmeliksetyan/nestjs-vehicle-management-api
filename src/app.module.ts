@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { CarsModule } from './cars/cars.module';
 import { CategoriesModule } from './categories/categories.module';
 import { MailModule } from './mail/mail.module';
+import { MeModule } from './me/me.module';
 import { TagsModule } from './tags/tags.module';
 import { UsersModule } from './users/users.module';
 
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module';
     CarsModule,
     CategoriesModule,
     MailModule,
+    MeModule,
     TagsModule,
     UsersModule,
   ],

@@ -16,6 +16,8 @@ import { CategoryResponseDto } from '../categories/dto/category-response.dto';
 import { ListCarsQueryDto } from './dto/list-cars-query.dto';
 import { PaginatedCarsResponseDto } from './dto/paginated-cars-response.dto';
 import { CategoryGroupDto } from './dto/grouped-by-category-response.dto';
+import { NearestCarResponseDto } from './dto/nearest-car-response.dto';
+import { haversineDistanceKm } from '../common/utils/haversine';
 
 @Injectable()
 export class CarsService {
@@ -183,6 +185,38 @@ export class CarsService {
     const groups = Array.from(byCategory.values());
     groups.sort((a, b) => a.category.name.localeCompare(b.category.name));
     return groups;
+  }
+
+  async getNearestCars(
+    latitude: number,
+    longitude: number,
+    radiusKm = 10,
+  ): Promise<NearestCarResponseDto[]> {
+    const cars = await this.carModel.findAll({
+      include: [
+        { model: Category, as: 'category' },
+        { model: CarImage, as: 'images' },
+        { model: Tag, as: 'tags' },
+      ],
+    });
+
+    const withDistance = cars
+      .map((car) => {
+        const distanceKm = haversineDistanceKm(
+          latitude,
+          longitude,
+          Number(car.latitude),
+          Number(car.longitude),
+        );
+        return { car, distanceKm };
+      })
+      .filter(({ distanceKm }) => distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    return withDistance.map(({ car, distanceKm }) => ({
+      ...this.toResponse(car),
+      distanceKm: Math.round(distanceKm * 100) / 100,
+    }));
   }
 
   async findOne(id: number): Promise<CarResponseDto> {

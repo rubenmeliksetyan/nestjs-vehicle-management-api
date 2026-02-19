@@ -357,6 +357,74 @@ describe('CarsService', () => {
     });
   });
 
+  describe('getNearestCars', () => {
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment -- service from module.get() in tests */
+    it('returns cars within radiusKm sorted by distance', async () => {
+      const userLat = 40.7128;
+      const userLon = -74.006;
+      const nearCar = {
+        ...mockCar,
+        id: 1,
+        latitude: 40.72,
+        longitude: -74.0,
+        category: mockCategory,
+        images: [],
+        tags: [],
+      };
+      const farCar = {
+        ...mockCar,
+        id: 2,
+        latitude: 50,
+        longitude: 50,
+        category: mockCategory,
+        images: [],
+        tags: [],
+      };
+      carModel.findAll.mockResolvedValue([nearCar, farCar]);
+
+      const result = await service.getNearestCars(userLat, userLon, 10);
+
+      expect(carModel.findAll).toHaveBeenCalledWith({
+        include: expect.arrayContaining([
+          expect.objectContaining({ model: Category }),
+          expect.objectContaining({ model: CarImage }),
+          expect.objectContaining({ model: Tag }),
+        ]),
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ id: 1 });
+      expect(result[0]).toHaveProperty('distanceKm');
+      expect(typeof (result[0] as { distanceKm?: number })?.distanceKm).toBe(
+        'number',
+      );
+    });
+
+    it('uses default radius 10km', async () => {
+      carModel.findAll.mockResolvedValue([]);
+
+      await service.getNearestCars(40.7128, -74.006);
+
+      expect(carModel.findAll).toHaveBeenCalled();
+    });
+
+    it('returns empty array when no cars in range', async () => {
+      const farCar = {
+        ...mockCar,
+        latitude: 50,
+        longitude: 50,
+        category: mockCategory,
+        images: [],
+        tags: [],
+      };
+      carModel.findAll.mockResolvedValue([farCar]);
+
+      const result = await service.getNearestCars(40.7128, -74.006, 10);
+
+      expect(result).toEqual([]);
+    });
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment */
+  });
+
   describe('findAll', () => {
     /* eslint-disable @typescript-eslint/no-unsafe-assignment -- service from module.get() in tests */
     it('returns cars with relationships', async () => {
