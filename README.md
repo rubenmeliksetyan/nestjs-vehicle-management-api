@@ -27,6 +27,8 @@
 
 ## Project setup
 
+Requires **Node.js 20 LTS** or newer (`engines.node` in `package.json`). Use `nvm use` if you have [nvm](https://github.com/nvm-sh/nvm) (`.nvmrc` is set to 20).
+
 ```bash
 $ npm install
 ```
@@ -56,6 +58,20 @@ $ npm run test:e2e
 # test coverage
 $ npm run test:cov
 ```
+
+## Security (npm audit)
+
+After `npm install`, if you see vulnerability warnings:
+
+1. **Apply safe fixes first** (no breaking changes):
+   ```bash
+   npm audit fix
+   ```
+2. **Optional – apply all possible fixes** (may upgrade major versions; run tests after):
+   ```bash
+   npm audit fix --force
+   ```
+3. Many reported issues are in **devDependencies** (e.g. Jest, ESLint). They do not run in production, so risk is lower. Focus on fixing **dependencies** (runtime) first. Re-run `npm audit` after any fix to see what remains.
 
 ## Deployment
 
