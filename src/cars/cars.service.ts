@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
+import { Op, WhereOptions } from 'sequelize';
 import { Car } from '../database/models/car.model';
 import { CarImage } from '../database/models/car-image.model';
 import { Category } from '../database/models/category.model';
@@ -12,6 +13,8 @@ import { CreateCarDto } from './dto/create-car.dto';
 import { UpdateCarDto } from './dto/update-car.dto';
 import { CarResponseDto } from './dto/car-response.dto';
 import { CategoryResponseDto } from '../categories/dto/category-response.dto';
+import { ListCarsQueryDto } from './dto/list-cars-query.dto';
+import { PaginatedCarsResponseDto } from './dto/paginated-cars-response.dto';
 
 @Injectable()
 export class CarsService {
@@ -93,6 +96,55 @@ export class CarsService {
       order: [['createdAt', 'DESC']],
     });
     return cars.map((car) => this.toResponse(car));
+  }
+
+  async listPublic(query: ListCarsQueryDto): Promise<PaginatedCarsResponseDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const offset = (page - 1) * limit;
+
+    const searchTerm = query.search?.trim();
+    const where: WhereOptions<Car> = {
+      ...(query.categoryId && { categoryId: query.categoryId }),
+      ...(searchTerm && {
+        [Op.or]: [
+          { make: { [Op.like]: `%${searchTerm}%` } },
+          { model: { [Op.like]: `%${searchTerm}%` } },
+        ],
+      }),
+    };
+
+    const tagInclude =
+      query.tagIds && query.tagIds.length > 0
+        ? {
+            model: Tag,
+            as: 'tags' as const,
+            where: { id: { [Op.in]: query.tagIds } },
+            required: true,
+          }
+        : { model: Tag, as: 'tags' as const };
+
+    const { count, rows: cars } = await this.carModel.findAndCountAll({
+      where,
+      include: [
+        { model: Category, as: 'category' },
+        { model: CarImage, as: 'images' },
+        tagInclude,
+      ],
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+      distinct: true,
+    });
+
+    const totalPages = Math.ceil(count / limit);
+    return {
+      data: cars.map((car) => this.toResponse(car)),
+      total: count,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async findOne(id: number): Promise<CarResponseDto> {

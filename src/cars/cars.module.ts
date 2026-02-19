@@ -6,6 +6,7 @@ import { CarImage } from '../database/models/car-image.model';
 import { Category } from '../database/models/category.model';
 import { Tag } from '../database/models/tag.model';
 import { CarsController } from './cars.controller';
+import { PublicCarsController } from './public-cars.controller';
 import { CarsService } from './cars.service';
 
 @Module({
@@ -13,7 +14,7 @@ import { CarsService } from './cars.service';
     AuthModule,
     SequelizeModule.forFeature([Car, CarImage, Category, Tag]),
   ],
-  controllers: [CarsController],
+  controllers: [PublicCarsController, CarsController],
   providers: [CarsService],
   exports: [CarsService],
 })

@@ -15,6 +15,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly userModel: typeof User,
   ) {
     const secret = config.get<string>('jwt.secret');
+    if (!secret) {
+      throw new Error('JWT secret is required');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,

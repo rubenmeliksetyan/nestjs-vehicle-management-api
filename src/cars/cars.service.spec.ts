@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/sequelize';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Op } from 'sequelize';
 import { Car } from '../database/models/car.model';
 import { CarImage } from '../database/models/car-image.model';
 import { Category } from '../database/models/category.model';
@@ -12,6 +13,7 @@ describe('CarsService', () => {
   let carModel: {
     findByPk: jest.Mock;
     findAll: jest.Mock;
+    findAndCountAll: jest.Mock;
     create: jest.Mock;
     sequelize: { transaction: jest.Mock };
   };
@@ -78,6 +80,7 @@ describe('CarsService', () => {
     carModel = {
       findByPk: jest.fn(),
       findAll: jest.fn().mockResolvedValue([]),
+      findAndCountAll: jest.fn().mockResolvedValue({ count: 0, rows: [] }),
       create: jest.fn().mockResolvedValue(mockCar),
       sequelize: {
         transaction: jest.fn().mockResolvedValue(mockTransaction),
@@ -201,7 +204,97 @@ describe('CarsService', () => {
     });
   });
 
+  describe('listPublic', () => {
+    it('returns paginated cars with default page and limit', async () => {
+      const cars = [
+        { ...mockCar, category: mockCategory, images: [], tags: [] },
+      ];
+      carModel.findAndCountAll.mockResolvedValue({ count: 1, rows: cars });
+
+      const result = await service.listPublic({});
+
+      expect(carModel.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          limit: 10,
+          offset: 0,
+          distinct: true,
+        }),
+      );
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(10);
+      expect(result.totalPages).toBe(1);
+    });
+
+    it('applies search filter on make and model', async () => {
+      carModel.findAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+
+      await service.listPublic({ search: 'Toyota' });
+
+      expect(carModel.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- expect.objectContaining in test
+          where: expect.objectContaining({
+            [Op.or]: [
+              { make: { [Op.like]: '%Toyota%' } },
+              { model: { [Op.like]: '%Toyota%' } },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('applies categoryId filter', async () => {
+      carModel.findAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+
+      await service.listPublic({ categoryId: 2 });
+
+      expect(carModel.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- expect.objectContaining in test
+          where: expect.objectContaining({ categoryId: 2 }),
+        }),
+      );
+    });
+
+    it('applies tagIds filter (ANY) with required join', async () => {
+      carModel.findAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+
+      await service.listPublic({ tagIds: [1, 2] });
+
+      type IncludeItem = { as?: string; where?: unknown; required?: boolean };
+      type FindAndCountOptions = { include?: IncludeItem[] };
+      const firstCallArgs = carModel.findAndCountAll.mock
+        .calls[0] as unknown as [FindAndCountOptions];
+      const call = firstCallArgs[0];
+      const tagInclude = call.include?.find(
+        (inc: IncludeItem) => inc.as === 'tags',
+      );
+      expect(tagInclude).toBeDefined();
+      expect(tagInclude?.where).toEqual({ id: { [Op.in]: [1, 2] } });
+      expect(tagInclude?.required).toBe(true);
+    });
+
+    it('uses custom page and limit', async () => {
+      carModel.findAndCountAll.mockResolvedValue({ count: 25, rows: [] });
+
+      const result = await service.listPublic({ page: 2, limit: 5 });
+
+      expect(carModel.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          limit: 5,
+          offset: 5,
+        }),
+      );
+      expect(result.page).toBe(2);
+      expect(result.limit).toBe(5);
+      expect(result.totalPages).toBe(5);
+    });
+  });
+
   describe('findAll', () => {
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment -- service from module.get() in tests */
     it('returns cars with relationships', async () => {
       const cars = [
         { ...mockCar, category: mockCategory, images: [], tags: [] },
@@ -211,7 +304,6 @@ describe('CarsService', () => {
       const result = await service.findAll();
 
       expect(carModel.findAll).toHaveBeenCalledWith({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- expect.arrayContaining return type in test
         include: expect.arrayContaining([
           expect.objectContaining({ model: Category }),
           expect.objectContaining({ model: CarImage }),
@@ -221,9 +313,11 @@ describe('CarsService', () => {
       });
       expect(result).toHaveLength(1);
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment */
   });
 
   describe('findOne', () => {
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment -- service from module.get() in tests */
     it('returns car with relationships', async () => {
       carModel.findByPk.mockResolvedValue({
         ...mockCar,
@@ -235,7 +329,6 @@ describe('CarsService', () => {
       const result = await service.findOne(1);
 
       expect(carModel.findByPk).toHaveBeenCalledWith(1, {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- expect.arrayContaining return type in test
         include: expect.arrayContaining([
           expect.objectContaining({ model: Category }),
           expect.objectContaining({ model: CarImage }),
@@ -244,6 +337,7 @@ describe('CarsService', () => {
       });
       expect(result).toMatchObject({ id: 1, make: 'Toyota' });
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
     it('throws NotFoundException when not found', async () => {
       carModel.findByPk.mockResolvedValue(null);
