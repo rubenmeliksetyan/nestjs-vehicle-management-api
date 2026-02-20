@@ -66,9 +66,6 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    volumes:
-      - ./src:/app/src
-      - ./dist:/app/dist
     networks:
       - vehicle-network
     command: sh -c "node scripts/wait-for-db.js && npm run migration:run && node dist/main.js"

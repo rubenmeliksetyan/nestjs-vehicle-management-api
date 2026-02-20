@@ -32,44 +32,44 @@ export class Car extends Model {
     type: DataType.STRING(255),
     allowNull: false,
   })
-  make!: string;
+  declare make: string;
 
   @Column({
     type: DataType.STRING(255),
     allowNull: false,
   })
-  model!: string;
+  declare model: string;
 
   @Column({
     type: DataType.INTEGER,
     allowNull: false,
   })
-  year!: number;
+  declare year: number;
 
   @Column({
     type: DataType.STRING(100),
     allowNull: false,
   })
-  color!: string;
+  declare color: string;
 
   @Column({
     type: DataType.DECIMAL(10, 2),
     allowNull: false,
   })
-  price!: number;
+  declare price: number;
 
   @Column({
     type: DataType.INTEGER,
     allowNull: false,
     defaultValue: 0,
   })
-  mileage!: number;
+  declare mileage: number;
 
   @Column({
     type: DataType.TEXT,
     allowNull: true,
   })
-  description?: string;
+  declare description?: string;
 
   @ForeignKey(() => Category)
   @Column({
@@ -77,28 +77,28 @@ export class Car extends Model {
     allowNull: false,
     field: 'category_id',
   })
-  categoryId!: number;
+  declare categoryId: number;
 
   @BelongsTo(() => Category)
-  category!: Category;
+  declare category: Category;
 
   @Column({
     type: DataType.DECIMAL(10, 8),
     allowNull: false,
   })
-  latitude!: number;
+  declare latitude: number;
 
   @Column({
     type: DataType.DECIMAL(11, 8),
     allowNull: false,
   })
-  longitude!: number;
+  declare longitude: number;
 
   @HasMany(() => CarImage)
-  images!: CarImage[];
+  declare images: CarImage[];
 
   @BelongsToMany(() => Tag, () => CarTag)
-  tags!: Tag[];
+  declare tags: Tag[];
 
   @CreatedAt
   declare createdAt: Date;

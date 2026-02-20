@@ -3,6 +3,7 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { AuthModule } from '../auth/auth.module';
 import { Car } from '../database/models/car.model';
 import { CarImage } from '../database/models/car-image.model';
+import { CarTag } from '../database/models/car-tag.model';
 import { Category } from '../database/models/category.model';
 import { Tag } from '../database/models/tag.model';
 import { CarsController } from './cars.controller';
@@ -12,7 +13,7 @@ import { CarsService } from './cars.service';
 @Module({
   imports: [
     AuthModule,
-    SequelizeModule.forFeature([Car, CarImage, Category, Tag]),
+    SequelizeModule.forFeature([Car, CarImage, CarTag, Category, Tag]),
   ],
   controllers: [PublicCarsController, CarsController],
   providers: [CarsService],

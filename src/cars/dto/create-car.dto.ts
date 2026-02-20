@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsArray,
+  ArrayMinSize,
   MaxLength,
   Min,
   Max,
@@ -53,10 +54,10 @@ export class CreateCarDto {
   @IsNumber({ maxDecimalPlaces: 8 })
   longitude!: number;
 
-  @IsOptional()
   @IsArray()
+  @ArrayMinSize(1)
   @IsString({ each: true })
-  imageUrls?: string[];
+  imageUrls!: string[];
 
   @IsOptional()
   @IsArray()

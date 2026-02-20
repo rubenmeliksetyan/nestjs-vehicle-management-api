@@ -41,7 +41,12 @@ async function seed() {
     );
     const exists = rows && rows.length > 0;
     if (exists) {
-      console.log('Admin user already exists:', adminEmail);
+      const [updateResult] = await sequelize.query(
+        'UPDATE users SET is_active = 1 WHERE email = :email',
+        { replacements: { email: adminEmail } },
+      );
+      const affected = updateResult?.affectedRows ?? 0;
+      console.log('Admin user already exists, enabled:', adminEmail, affected ? `(updated ${affected} row(s))` : '');
       process.exit(0);
       return;
     }

@@ -26,28 +26,28 @@ export class User extends Model {
     allowNull: false,
     unique: true,
   })
-  email!: string;
+  declare email: string;
 
   @Column({
     type: DataType.STRING(255),
     allowNull: false,
     field: 'full_name',
   })
-  fullName!: string;
+  declare fullName: string;
 
   @Column({
     type: DataType.STRING(255),
     allowNull: false,
     field: 'password_hash',
   })
-  passwordHash!: string;
+  declare passwordHash: string;
 
   @Column({
     type: DataType.ENUM(...Object.values(Role)),
     allowNull: false,
     defaultValue: Role.USER,
   })
-  role!: Role;
+  declare role: Role;
 
   @Column({
     type: DataType.BOOLEAN,
@@ -55,7 +55,7 @@ export class User extends Model {
     defaultValue: true,
     field: 'is_active',
   })
-  isActive!: boolean;
+  declare isActive: boolean;
 
   @CreatedAt
   declare createdAt: Date;

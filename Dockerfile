@@ -21,6 +21,8 @@ RUN npm ci --only=production && \
 
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/scripts ./scripts
+COPY --from=builder --chown=nestjs:nodejs /app/database ./database
+COPY --from=builder --chown=nestjs:nodejs /app/.sequelizerc ./.sequelizerc
 COPY --chown=nestjs:nodejs .env.example ./.env.example
 
 USER nestjs

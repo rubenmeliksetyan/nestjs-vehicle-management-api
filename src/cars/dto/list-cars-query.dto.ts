@@ -3,10 +3,12 @@ import {
   IsString,
   IsInt,
   IsArray,
+  IsIn,
   Min,
   Max,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
+import type { CarOrderBy } from './find-all-cars-query.dto';
 
 export class ListCarsQueryDto {
   @IsOptional()
@@ -33,13 +35,36 @@ export class ListCarsQueryDto {
   categoryId?: number;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    Array.isArray(value)
-      ? value.map(Number)
-      : value
-        ? [Number(value)]
-        : undefined,
-  )
+  @IsString()
+  @IsIn([
+    'id',
+    'make',
+    'model',
+    'year',
+    'color',
+    'price',
+    'mileage',
+    'createdAt',
+    'updatedAt',
+  ])
+  orderBy: CarOrderBy = 'createdAt';
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['ASC', 'DESC'])
+  orderDirection?: 'ASC' | 'DESC' = 'DESC';
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value == null || value === '') return undefined;
+    if (Array.isArray(value)) return value.map((v) => Number(v));
+    const str = String(value);
+    const numbers = str
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => !Number.isNaN(n));
+    return numbers.length > 0 ? numbers : undefined;
+  })
   @IsArray()
   @IsInt({ each: true })
   tagIds?: number[];
