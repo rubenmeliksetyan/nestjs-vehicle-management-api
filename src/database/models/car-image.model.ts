@@ -29,16 +29,16 @@ export class CarImage extends Model {
     allowNull: false,
     field: 'car_id',
   })
-  carId!: number;
+  declare carId: number;
 
   @BelongsTo(() => Car)
-  car!: Car;
+  declare car: Car;
 
   @Column({
     type: DataType.STRING(500),
     allowNull: false,
   })
-  url!: string;
+  declare url: string;
 
   @CreatedAt
   declare createdAt: Date;

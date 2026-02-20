@@ -4,6 +4,7 @@ import {
   IsInt,
   IsNumber,
   IsArray,
+  ArrayMinSize,
   MaxLength,
   Min,
   Max,
@@ -60,6 +61,7 @@ export class UpdateCarDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMinSize(1)
   @IsString({ each: true })
   imageUrls?: string[];
 

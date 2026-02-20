@@ -88,7 +88,6 @@ Collection variable `baseUrl` defaults to `http://localhost:3000/api/v1`. Run **
 | `npm run build` | Build |
 | `npm run start` / `start:dev` / `start:prod` | Run app |
 | `npm run test` | Unit tests |
-| `npm run test:e2e` | E2E tests |
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier |
 | `npm run migration:run` | Run DB migrations |

@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { Op, WhereOptions } from 'sequelize';
+import { Op, Transaction, WhereOptions } from 'sequelize';
 import { Car } from '../database/models/car.model';
 import { CarImage } from '../database/models/car-image.model';
 import { Category } from '../database/models/category.model';
@@ -14,6 +14,7 @@ import { UpdateCarDto } from './dto/update-car.dto';
 import { CarResponseDto } from './dto/car-response.dto';
 import { CategoryResponseDto } from '../categories/dto/category-response.dto';
 import { ListCarsQueryDto } from './dto/list-cars-query.dto';
+import { FindAllCarsQueryDto } from './dto/find-all-cars-query.dto';
 import { PaginatedCarsResponseDto } from './dto/paginated-cars-response.dto';
 import { CategoryGroupDto } from './dto/grouped-by-category-response.dto';
 import { NearestCarResponseDto } from './dto/nearest-car-response.dto';
@@ -83,20 +84,21 @@ export class CarsService {
       await transaction.commit();
 
       return this.findOne(car.id);
-    } catch (error) {
+    } catch (err: unknown) {
       await transaction.rollback();
-      throw error;
+      throw err;
     }
   }
 
-  async findAll(): Promise<CarResponseDto[]> {
+  async findAll(query: FindAllCarsQueryDto): Promise<CarResponseDto[]> {
+    const { orderBy, orderDirection } = query;
     const cars = await this.carModel.findAll({
       include: [
         { model: Category, as: 'category' },
         { model: CarImage, as: 'images' },
         { model: Tag, as: 'tags' },
       ],
-      order: [['createdAt', 'DESC']],
+      order: [[orderBy, orderDirection]],
     });
     return cars.map((car) => this.toResponse(car));
   }
@@ -127,6 +129,8 @@ export class CarsService {
           }
         : { model: Tag, as: 'tags' as const };
 
+    const orderBy = query.orderBy ?? 'createdAt';
+    const orderDirection: 'ASC' | 'DESC' = query.orderDirection ?? 'DESC';
     const { count, rows: cars } = await this.carModel.findAndCountAll({
       where,
       include: [
@@ -134,7 +138,7 @@ export class CarsService {
         { model: CarImage, as: 'images' },
         tagInclude,
       ],
-      order: [['createdAt', 'DESC']],
+      order: [[orderBy, orderDirection]],
       limit,
       offset,
       distinct: true,
@@ -182,7 +186,10 @@ export class CarsService {
       byCategory.get(car.categoryId)!.cars.push(this.toResponse(car));
     }
 
-    const groups = Array.from(byCategory.values());
+    const groups = Array.from(byCategory.values()).map((g) => ({
+      ...g,
+      totalCount: g.cars.length,
+    }));
     groups.sort((a, b) => a.category.name.localeCompare(b.category.name));
     return groups;
   }
@@ -234,72 +241,80 @@ export class CarsService {
   }
 
   async update(id: number, dto: UpdateCarDto): Promise<CarResponseDto> {
-    const car = await this.carModel.findByPk(id);
-    if (!car) {
-      throw new NotFoundException('Car not found');
-    }
+    return this.carModel.sequelize!.transaction(async (transaction) => {
+      const car = await this.carModel.findByPk(id, { transaction });
+      if (!car) {
+        throw new NotFoundException('Car not found');
+      }
+      await this.validateUpdate(dto, transaction);
+      await this.applyUpdate(car, dto, transaction);
+      return this.findOne(car.id);
+    });
+  }
 
+  private async validateUpdate(
+    dto: UpdateCarDto,
+    transaction: Transaction,
+  ): Promise<void> {
     if (dto.categoryId !== undefined) {
-      const category = await this.categoryModel.findByPk(dto.categoryId);
+      const category = await this.categoryModel.findByPk(dto.categoryId, {
+        transaction,
+      });
       if (!category) {
         throw new NotFoundException('Category not found');
       }
     }
-
     if (dto.tagIds !== undefined) {
-      if (dto.tagIds.length > 0) {
+      const tagIds = [...new Set(dto.tagIds)];
+      if (tagIds.length > 0) {
         const tags = await this.tagModel.findAll({
-          where: { id: dto.tagIds },
+          where: { id: tagIds },
+          transaction,
         });
-        if (tags.length !== dto.tagIds.length) {
+        if (tags.length !== tagIds.length) {
           throw new BadRequestException('One or more tags not found');
         }
       }
     }
+  }
 
-    const transaction = await this.carModel.sequelize!.transaction();
+  private async applyUpdate(
+    car: Car,
+    dto: UpdateCarDto,
+    transaction: Transaction,
+  ): Promise<void> {
+    if (dto.make !== undefined) car.make = dto.make.trim();
+    if (dto.model !== undefined) car.model = dto.model.trim();
+    if (dto.year !== undefined) car.year = dto.year;
+    if (dto.color !== undefined) car.color = dto.color.trim();
+    if (dto.price !== undefined) car.price = dto.price;
+    if (dto.mileage !== undefined) car.mileage = dto.mileage;
+    if (dto.description !== undefined) car.description = dto.description.trim();
+    if (dto.categoryId !== undefined) car.categoryId = dto.categoryId;
+    if (dto.latitude !== undefined) car.latitude = dto.latitude;
+    if (dto.longitude !== undefined) car.longitude = dto.longitude;
 
-    try {
-      if (dto.make !== undefined) car.make = dto.make.trim();
-      if (dto.model !== undefined) car.model = dto.model.trim();
-      if (dto.year !== undefined) car.year = dto.year;
-      if (dto.color !== undefined) car.color = dto.color.trim();
-      if (dto.price !== undefined) car.price = dto.price;
-      if (dto.mileage !== undefined) car.mileage = dto.mileage;
-      if (dto.description !== undefined)
-        car.description = dto.description.trim();
-      if (dto.categoryId !== undefined) car.categoryId = dto.categoryId;
-      if (dto.latitude !== undefined) car.latitude = dto.latitude;
-      if (dto.longitude !== undefined) car.longitude = dto.longitude;
+    await car.save({ transaction });
 
-      await car.save({ transaction });
-
-      if (dto.imageUrls !== undefined) {
-        await this.carImageModel.destroy({
-          where: { carId: car.id },
-          transaction,
-        });
-        if (dto.imageUrls.length > 0) {
-          await this.carImageModel.bulkCreate(
-            dto.imageUrls.map((url) => ({
-              carId: car.id,
-              url: url.trim(),
-            })),
-            { transaction },
-          );
-        }
+    if (dto.imageUrls !== undefined) {
+      await this.carImageModel.destroy({
+        where: { carId: car.id },
+        transaction,
+      });
+      if (dto.imageUrls.length > 0) {
+        await this.carImageModel.bulkCreate(
+          dto.imageUrls.map((url) => ({
+            carId: car.id,
+            url: url.trim(),
+          })),
+          { transaction },
+        );
       }
+    }
 
-      if (dto.tagIds !== undefined) {
-        await car.$set('tags', dto.tagIds, { transaction });
-      }
-
-      await transaction.commit();
-
-      return this.findOne(car.id);
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
+    if (dto.tagIds !== undefined) {
+      const tagIds = [...new Set(dto.tagIds)];
+      await car.$set('tags', tagIds, { transaction });
     }
   }
 
@@ -312,44 +327,43 @@ export class CarsService {
   }
 
   private toResponse(car: Car): CarResponseDto {
+    const category = car.get('category') as Category | undefined;
+    const images = car.get('images') as CarImage[] | undefined;
+    const tags = car.get('tags') as Tag[] | undefined;
     return {
-      id: car.id,
-      make: car.make,
-      model: car.model,
-      year: car.year,
-      color: car.color,
-      price: Number(car.price),
-      mileage: car.mileage,
-      description: car.description,
-      categoryId: car.categoryId,
-      category: car.category
-        ? ({
-            id: car.category.id,
-            name: car.category.name,
-            createdAt: car.category.createdAt,
-            updatedAt: car.category.updatedAt,
-          } as CategoryResponseDto)
+      id: car.get('id'),
+      make: car.get('make'),
+      model: car.get('model'),
+      year: car.get('year'),
+      color: car.get('color'),
+      price: Number(car.get('price')),
+      mileage: car.get('mileage'),
+      description: (car.get('description') as string | null) ?? undefined,
+      categoryId: car.get('categoryId'),
+      category: category
+        ? {
+            id: category.get('id'),
+            name: category.get('name'),
+            createdAt: category.get('createdAt'),
+            updatedAt: category.get('updatedAt'),
+          }
         : undefined,
-      latitude: Number(car.latitude),
-      longitude: Number(car.longitude),
-      images: car.images
-        ? car.images.map((img) => ({
-            id: img.id,
-            url: img.url,
-            createdAt: img.createdAt,
-            updatedAt: img.updatedAt,
-          }))
-        : undefined,
-      tags: car.tags
-        ? car.tags.map((tag) => ({
-            id: tag.id,
-            name: tag.name,
-            createdAt: tag.createdAt,
-            updatedAt: tag.updatedAt,
-          }))
-        : undefined,
-      createdAt: car.createdAt,
-      updatedAt: car.updatedAt,
+      latitude: Number(car.get('latitude')),
+      longitude: Number(car.get('longitude')),
+      images: images?.map((img) => ({
+        id: img.get('id'),
+        url: img.get('url'),
+        createdAt: img.get('createdAt'),
+        updatedAt: img.get('updatedAt'),
+      })),
+      tags: tags?.map((tag) => ({
+        id: tag.get('id'),
+        name: tag.get('name'),
+        createdAt: tag.get('createdAt'),
+        updatedAt: tag.get('updatedAt'),
+      })),
+      createdAt: car.get('createdAt'),
+      updatedAt: car.get('updatedAt'),
     };
   }
 }

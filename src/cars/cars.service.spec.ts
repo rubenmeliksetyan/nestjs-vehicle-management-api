@@ -26,21 +26,29 @@ describe('CarsService', () => {
   let mockCar: ReturnType<typeof createMockCar>;
   let mockTransaction: ReturnType<typeof createMockTransaction>;
 
-  const mockCategory = {
+  const withGet = <T extends Record<string, unknown>>(
+    o: T,
+  ): T & { get: (k: string) => unknown } => ({
+    ...o,
+    get(key: string) {
+      return (this as Record<string, unknown>)[key];
+    },
+  });
+  const mockCategory = withGet({
     id: 1,
     name: 'Sedan',
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
-
-  const mockTag = {
+  });
+  const mockTag = withGet({
     id: 1,
     name: 'Eco',
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
+  });
 
   function createMockCar(overrides: Record<string, unknown> = {}) {
+
     return {
       id: 1,
       make: 'Toyota',
@@ -58,6 +66,9 @@ describe('CarsService', () => {
       $set: jest.fn().mockResolvedValue(undefined),
       save: jest.fn().mockResolvedValue(undefined),
       destroy: jest.fn().mockResolvedValue(undefined),
+      get(key: string) {
+        return (this as Record<string, unknown>)[key];
+      },
       ...overrides,
     };
   }
@@ -83,7 +94,14 @@ describe('CarsService', () => {
       findAndCountAll: jest.fn().mockResolvedValue({ count: 0, rows: [] }),
       create: jest.fn().mockResolvedValue(mockCar),
       sequelize: {
-        transaction: jest.fn().mockResolvedValue(mockTransaction),
+        transaction: jest
+          .fn()
+          .mockImplementation((cb?: (t: typeof mockTransaction) => unknown) => {
+            if (typeof cb === 'function') {
+              return Promise.resolve(cb(mockTransaction));
+            }
+            return Promise.resolve(mockTransaction);
+          }),
       },
     };
     carImageModel = {
@@ -133,6 +151,7 @@ describe('CarsService', () => {
       categoryId: 1,
       latitude: 40.7128,
       longitude: -74.006,
+      imageUrls: ['http://example.com/car.jpg'],
     };
 
     it('creates car with category', async () => {
@@ -194,7 +213,11 @@ describe('CarsService', () => {
     });
 
     it('throws BadRequestException when tag not found', async () => {
-      const dtoWithTags = { ...createDto, tagIds: [999] };
+      const dtoWithTags = {
+        ...createDto,
+        imageUrls: ['http://example.com/car.jpg'],
+        tagIds: [999],
+      };
       tagModel.findAll.mockResolvedValue([]);
 
       await expect(service.create(dtoWithTags)).rejects.toThrow(
@@ -295,18 +318,18 @@ describe('CarsService', () => {
 
   describe('listGroupedByCategory', () => {
     it('returns cars grouped by category sorted by category name', async () => {
-      const sedan = {
+      const sedan = withGet({
         id: 1,
         name: 'Sedan',
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-      const suv = {
+      });
+      const suv = withGet({
         id: 2,
         name: 'SUV',
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
+      });
       const cars = [
         {
           ...mockCar,
@@ -346,6 +369,8 @@ describe('CarsService', () => {
       expect(result[1]?.category.name).toBe('SUV');
       expect(result[0]?.cars).toHaveLength(1);
       expect(result[1]?.cars).toHaveLength(1);
+      expect(result[0]).toHaveProperty('totalCount', 1);
+      expect(result[1]).toHaveProperty('totalCount', 1);
     });
 
     it('returns empty array when no cars', async () => {
@@ -427,7 +452,7 @@ describe('CarsService', () => {
 
   describe('findAll', () => {
     /* eslint-disable @typescript-eslint/no-unsafe-assignment -- service from module.get() in tests */
-    it('returns cars with relationships', async () => {
+    it('returns cars with relationships using default ordering', async () => {
       const cars = [
         { ...mockCar, category: mockCategory, images: [], tags: [] },
       ];
@@ -442,6 +467,28 @@ describe('CarsService', () => {
           expect.objectContaining({ model: Tag }),
         ]),
         order: [['createdAt', 'DESC']],
+      });
+      expect(result).toHaveLength(1);
+    });
+
+    it('returns cars with custom ordering', async () => {
+      const cars = [
+        { ...mockCar, category: mockCategory, images: [], tags: [] },
+      ];
+      carModel.findAll.mockResolvedValue(cars);
+
+      const result = await service.findAll({
+        orderBy: 'price',
+        orderDirection: 'ASC',
+      });
+
+      expect(carModel.findAll).toHaveBeenCalledWith({
+        include: expect.arrayContaining([
+          expect.objectContaining({ model: Category }),
+          expect.objectContaining({ model: CarImage }),
+          expect.objectContaining({ model: Tag }),
+        ]),
+        order: [['price', 'ASC']],
       });
       expect(result).toHaveLength(1);
     });
@@ -498,7 +545,6 @@ describe('CarsService', () => {
 
       expect(mockCar.make).toBe('Honda');
       expect(mockCar.save).toHaveBeenCalled();
-      expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
     it('replaces images when imageUrls provided', async () => {
@@ -565,7 +611,6 @@ describe('CarsService', () => {
       await expect(service.update(1, { categoryId: 999 })).rejects.toThrow(
         NotFoundException,
       );
-      expect(carModel.sequelize.transaction).not.toHaveBeenCalled();
     });
   });
 

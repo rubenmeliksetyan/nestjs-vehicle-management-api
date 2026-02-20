@@ -25,10 +25,10 @@ export class CarTag extends Model {
     allowNull: false,
     field: 'car_id',
   })
-  carId!: number;
+  declare carId: number;
 
   @BelongsTo(() => Car)
-  car!: Car;
+  declare car: Car;
 
   @ForeignKey(() => Tag)
   @PrimaryKey
@@ -37,10 +37,10 @@ export class CarTag extends Model {
     allowNull: false,
     field: 'tag_id',
   })
-  tagId!: number;
+  declare tagId: number;
 
   @BelongsTo(() => Tag)
-  tag!: Tag;
+  declare tag: Tag;
 
   @CreatedAt
   declare createdAt: Date;

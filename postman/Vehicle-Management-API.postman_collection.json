@@ -19,7 +19,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\"\n}"
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"fullName\": \"John Doe\",\n  \"password\": \"Password123!\"\n}"
             },
             "url": "{{baseUrl}}/auth/signup"
           }
@@ -68,7 +68,7 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/cars?page=1&limit=10",
+              "raw": "{{baseUrl}}/cars?page=1&limit=10&orderBy=createdAt&orderDirection=DESC",
               "host": ["{{baseUrl}}"],
               "path": ["cars"],
               "query": [
@@ -76,7 +76,9 @@
                 { "key": "limit", "value": "10" },
                 { "key": "search", "value": "", "disabled": true },
                 { "key": "categoryId", "value": "", "disabled": true },
-                { "key": "tagIds", "value": "", "disabled": true }
+                { "key": "tagIds", "value": "1,2", "description": "Comma-separated tag IDs" },
+                { "key": "orderBy", "value": "createdAt", "description": "Sort by: id, make, model, year, color, price, mileage, createdAt, updatedAt" },
+                { "key": "orderDirection", "value": "DESC", "description": "ASC or DESC" }
               ]
             }
           }
@@ -108,6 +110,21 @@
                 { "key": "radiusKm", "value": "10" }
               ]
             }
+          }
+        },
+        {
+          "name": "Request pickup",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carId\": 1,\n  \"latitude\": 52.52,\n  \"longitude\": 13.405\n}"
+            },
+            "url": "{{baseUrl}}/me/request-pickup"
           }
         }
       ]
@@ -161,6 +178,34 @@
             "method": "DELETE",
             "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
             "url": "{{baseUrl}}/categories/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Users",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/admin/users"
+          }
+        },
+        {
+          "name": "Disable/Enable user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}"
+            },
+            "url": "{{baseUrl}}/admin/users/1"
           }
         }
       ]
@@ -231,7 +276,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Toyota Corolla\",\n  \"categoryId\": 1,\n  \"tagIds\": [1],\n  \"latitude\": 52.52,\n  \"longitude\": 13.405\n}"
+              "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"year\": 2022,\n  \"color\": \"Blue\",\n  \"price\": 25000,\n  \"mileage\": 0,\n  \"categoryId\": 1,\n  \"latitude\": 52.52,\n  \"longitude\": 13.405,\n  \"imageUrls\": [\"https://example.com/car.jpg\"],\n  \"tagIds\": [1]\n}"
             },
             "url": "{{baseUrl}}/admin/cars"
           }
@@ -241,7 +286,15 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": "{{baseUrl}}/admin/cars"
+            "url": {
+              "raw": "{{baseUrl}}/admin/cars?orderBy=createdAt&orderDirection=DESC",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "cars"],
+              "query": [
+                { "key": "orderBy", "value": "createdAt", "description": "Field to sort by: id, make, model, year, color, price, mileage, createdAt, updatedAt" },
+                { "key": "orderDirection", "value": "DESC", "description": "Sort direction: ASC or DESC" }
+              ]
+            }
           }
         },
         {
@@ -262,7 +315,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Toyota Corolla Updated\",\n  \"latitude\": 52.53,\n  \"longitude\": 13.41\n}"
+              "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla Updated\",\n  \"latitude\": 52.53,\n  \"longitude\": 13.41,\n  \"imageUrls\": [\"https://example.com/car-updated.jpg\"]\n}"
             },
             "url": "{{baseUrl}}/admin/cars/1"
           }

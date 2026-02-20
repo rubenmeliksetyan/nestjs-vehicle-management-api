@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -15,6 +16,7 @@ import { JwtAuthGuard, RolesGuard, Roles } from '../auth';
 import { CarsService } from './cars.service';
 import { CreateCarDto } from './dto/create-car.dto';
 import { UpdateCarDto } from './dto/update-car.dto';
+import { FindAllCarsQueryDto } from './dto/find-all-cars-query.dto';
 
 @ApiTags('admin/cars')
 @ApiBearerAuth('access-token')
@@ -30,8 +32,8 @@ export class CarsController {
   }
 
   @Get()
-  findAll() {
-    return this.carsService.findAll();
+  findAll(@Query() query: FindAllCarsQueryDto) {
+    return this.carsService.findAll(query);
   }
 
   @Get(':id')

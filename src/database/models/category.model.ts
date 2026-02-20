@@ -25,7 +25,7 @@ export class Category extends Model {
     allowNull: false,
     unique: true,
   })
-  name!: string;
+  declare name: string;
 
   @CreatedAt
   declare createdAt: Date;
