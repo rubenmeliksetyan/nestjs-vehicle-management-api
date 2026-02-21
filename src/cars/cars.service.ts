@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { Op, Transaction, WhereOptions } from 'sequelize';
+import { Op, Transaction, WhereOptions, literal } from 'sequelize';
 import { Car } from '../database/models/car.model';
 import { CarImage } from '../database/models/car-image.model';
 import { Category } from '../database/models/category.model';
@@ -18,7 +18,6 @@ import { FindAllCarsQueryDto } from './dto/find-all-cars-query.dto';
 import { PaginatedCarsResponseDto } from './dto/paginated-cars-response.dto';
 import { CategoryGroupDto } from './dto/grouped-by-category-response.dto';
 import { NearestCarResponseDto } from './dto/nearest-car-response.dto';
-import { haversineDistanceKm } from '../common/utils/haversine';
 
 @Injectable()
 export class CarsService {
@@ -90,7 +89,9 @@ export class CarsService {
     }
   }
 
-  async findAll(query: FindAllCarsQueryDto): Promise<CarResponseDto[]> {
+  async findAll(
+    query: FindAllCarsQueryDto = new FindAllCarsQueryDto(),
+  ): Promise<CarResponseDto[]> {
     const { orderBy, orderDirection } = query;
     const cars = await this.carModel.findAll({
       include: [
@@ -199,31 +200,67 @@ export class CarsService {
     longitude: number,
     radiusKm = 10,
   ): Promise<NearestCarResponseDto[]> {
+    const safeLatitude = Number(latitude);
+    const safeLongitude = Number(longitude);
+    const safeRadiusKm = Number(radiusKm);
+    if (
+      !Number.isFinite(safeLatitude) ||
+      !Number.isFinite(safeLongitude) ||
+      !Number.isFinite(safeRadiusKm) ||
+      safeRadiusKm <= 0
+    ) {
+      throw new BadRequestException('Invalid coordinates or radius');
+    }
+
+    const { minLatitude, maxLatitude, minLongitude, maxLongitude } =
+      this.getBoundingBox(safeLatitude, safeLongitude, safeRadiusKm);
+    const radiusMeters = Math.round(safeRadiusKm * 1000);
+    const distanceExpr = `ST_Distance_Sphere(POINT(\`Car\`.\`longitude\`, \`Car\`.\`latitude\`), POINT(${safeLongitude}, ${safeLatitude}))`;
+
     const cars = await this.carModel.findAll({
+      attributes: {
+        include: [[literal(distanceExpr), 'distanceMeters']],
+      },
+      where: {
+        [Op.and]: [
+          { latitude: { [Op.between]: [minLatitude, maxLatitude] } },
+          { longitude: { [Op.between]: [minLongitude, maxLongitude] } },
+          literal(`${distanceExpr} <= ${radiusMeters}`),
+        ],
+      } as WhereOptions<Car>,
       include: [
         { model: Category, as: 'category' },
         { model: CarImage, as: 'images' },
         { model: Tag, as: 'tags' },
       ],
+      order: [[literal(distanceExpr), 'ASC']],
     });
 
-    const withDistance = cars
-      .map((car) => {
-        const distanceKm = haversineDistanceKm(
-          latitude,
-          longitude,
-          Number(car.latitude),
-          Number(car.longitude),
-        );
-        return { car, distanceKm };
-      })
-      .filter(({ distanceKm }) => distanceKm <= radiusKm)
-      .sort((a, b) => a.distanceKm - b.distanceKm);
+    return cars.map((car) => {
+      const distanceMeters = Number(car.get('distanceMeters'));
+      return {
+        ...this.toResponse(car),
+        distanceKm: Math.round((distanceMeters / 1000) * 100) / 100,
+      };
+    });
+  }
 
-    return withDistance.map(({ car, distanceKm }) => ({
-      ...this.toResponse(car),
-      distanceKm: Math.round(distanceKm * 100) / 100,
-    }));
+  private getBoundingBox(
+    latitude: number,
+    longitude: number,
+    radiusKm: number,
+  ) {
+    const latitudeDelta = radiusKm / 111.32;
+    const longitudeDivisor = 111.32 * Math.cos((latitude * Math.PI) / 180);
+    const safeLongitudeDivisor =
+      Math.abs(longitudeDivisor) < 1e-6 ? 1e-6 : longitudeDivisor;
+    const longitudeDelta = radiusKm / Math.abs(safeLongitudeDivisor);
+    return {
+      minLatitude: latitude - latitudeDelta,
+      maxLatitude: latitude + latitudeDelta,
+      minLongitude: longitude - longitudeDelta,
+      maxLongitude: longitude + longitudeDelta,
+    };
   }
 
   async findOne(id: number): Promise<CarResponseDto> {

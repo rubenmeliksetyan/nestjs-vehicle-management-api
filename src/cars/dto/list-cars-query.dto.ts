@@ -47,7 +47,7 @@ export class ListCarsQueryDto {
     'createdAt',
     'updatedAt',
   ])
-  orderBy: CarOrderBy = 'createdAt';
+  orderBy?: CarOrderBy = 'createdAt';
 
   @IsOptional()
   @IsString()

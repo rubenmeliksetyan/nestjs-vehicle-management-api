@@ -48,7 +48,6 @@ describe('CarsService', () => {
   });
 
   function createMockCar(overrides: Record<string, unknown> = {}) {
-
     return {
       id: 1,
       make: 'Toyota',
@@ -253,7 +252,7 @@ describe('CarsService', () => {
     it('applies search filter on make and model', async () => {
       carModel.findAndCountAll.mockResolvedValue({ count: 0, rows: [] });
 
-      await service.listPublic({ search: 'Toyota' });
+      await service.listPublic({ orderBy: undefined, search: 'Toyota' });
 
       expect(carModel.findAndCountAll).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -384,44 +383,70 @@ describe('CarsService', () => {
 
   describe('getNearestCars', () => {
     /* eslint-disable @typescript-eslint/no-unsafe-assignment -- service from module.get() in tests */
-    it('returns cars within radiusKm sorted by distance', async () => {
+    it('builds DB distance query and maps distanceKm', async () => {
       const userLat = 40.7128;
       const userLon = -74.006;
-      const nearCar = {
+      const nearestCar = {
         ...mockCar,
         id: 1,
         latitude: 40.72,
         longitude: -74.0,
+        distanceMeters: 1250,
         category: mockCategory,
         images: [],
         tags: [],
       };
-      const farCar = {
+      const secondNearestCar = {
         ...mockCar,
         id: 2,
-        latitude: 50,
-        longitude: 50,
+        latitude: 40.74,
+        longitude: -73.98,
+        distanceMeters: 3500,
         category: mockCategory,
         images: [],
         tags: [],
       };
-      carModel.findAll.mockResolvedValue([nearCar, farCar]);
+      carModel.findAll.mockResolvedValue([nearestCar, secondNearestCar]);
 
       const result = await service.getNearestCars(userLat, userLon, 10);
 
-      expect(carModel.findAll).toHaveBeenCalledWith({
+      type NearestQueryArgs = {
+        attributes?: { include?: unknown[] };
+        where?: Record<symbol, unknown[]>;
+        include?: unknown[];
+        order?: unknown[];
+      };
+      const findAllCalls = carModel.findAll.mock.calls as unknown as Array<
+        [NearestQueryArgs]
+      >;
+      const findAllArgs = findAllCalls[0][0];
+      expect(findAllArgs).toMatchObject({
         include: expect.arrayContaining([
           expect.objectContaining({ model: Category }),
           expect.objectContaining({ model: CarImage }),
           expect.objectContaining({ model: Tag }),
         ]),
+        attributes: expect.objectContaining({
+          include: expect.any(Array),
+        }),
+        where: expect.any(Object),
+        order: [[expect.any(Object), 'ASC']],
       });
-      expect(result).toHaveLength(1);
+      const andClauses = (findAllArgs.where as Record<symbol, unknown[]>)[
+        Op.and
+      ];
+      expect(andClauses).toHaveLength(3);
+      expect(andClauses[0]).toMatchObject({
+        latitude: { [Op.between]: expect.any(Array) },
+      });
+      expect(andClauses[1]).toMatchObject({
+        longitude: { [Op.between]: expect.any(Array) },
+      });
+
+      expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ id: 1 });
-      expect(result[0]).toHaveProperty('distanceKm');
-      expect(typeof (result[0] as { distanceKm?: number })?.distanceKm).toBe(
-        'number',
-      );
+      expect(result[0]?.distanceKm).toBe(1.25);
+      expect(result[1]?.distanceKm).toBe(3.5);
     });
 
     it('uses default radius 10km', async () => {
@@ -429,19 +454,25 @@ describe('CarsService', () => {
 
       await service.getNearestCars(40.7128, -74.006);
 
-      expect(carModel.findAll).toHaveBeenCalled();
+      type DefaultRadiusQueryArgs = {
+        where?: Record<symbol, unknown[]>;
+      };
+      const findAllCalls = carModel.findAll.mock.calls as unknown as Array<
+        [DefaultRadiusQueryArgs]
+      >;
+      const findAllArgs = findAllCalls[0][0];
+      const andClauses = (findAllArgs.where as Record<symbol, unknown[]>)[
+        Op.and
+      ];
+      const latitudeRange = (
+        andClauses[0] as { latitude: { [Op.between]: [number, number] } }
+      ).latitude[Op.between];
+      expect(latitudeRange[0]).toBeLessThan(40.7128);
+      expect(latitudeRange[1]).toBeGreaterThan(40.7128);
     });
 
-    it('returns empty array when no cars in range', async () => {
-      const farCar = {
-        ...mockCar,
-        latitude: 50,
-        longitude: 50,
-        category: mockCategory,
-        images: [],
-        tags: [],
-      };
-      carModel.findAll.mockResolvedValue([farCar]);
+    it('returns empty array when DB returns no cars', async () => {
+      carModel.findAll.mockResolvedValue([]);
 
       const result = await service.getNearestCars(40.7128, -74.006, 10);
 
